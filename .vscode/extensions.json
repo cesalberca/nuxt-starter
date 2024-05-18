@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "antfu.unocss",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "Prisma.prisma",
+    "redhat.vscode-yaml",
+    "Vue.volar"
+  ]
+}

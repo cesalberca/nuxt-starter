@@ -1,0 +1,307 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+name: "webapp"
+
+# https://hub.docker.com/_/traefik
+x-traefik-image: &traefik-image "docker.io/traefik:3.0"
+# https://hub.docker.com/r/keycloak/keycloak
+x-keycloak-image: &keycloak-image "docker.io/keycloak/keycloak:24.0"
+# https://hub.docker.com/_/postgres
+x-postgres-image: &postgres-image "docker.io/postgres:16-bookworm"
+
+services:
+  traefik:
+    image: *traefik-image
+    restart: "always"
+    networks:
+      - "public"
+      - "private"
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+      - "127.0.0.1:5432:5432/tcp"
+      - "127.0.0.1:8080:8080/tcp"
+    volumes:
+      - { type: "bind", source: "/var/run/docker.sock", target: "/var/run/docker.sock", read_only: true }
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--api.disableDashboardAd=true"
+      - "--global.checkNewVersion=false"
+      - "--global.sendAnonymousUsage=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--entrypoints.web.address=:80/tcp"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443/tcp"
+      - "--entrypoints.websecure.http3.advertisedPort=443"
+      - "--entrypoints.postgres.address=:5432/tcp"
+      - "--ping=true"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      start_period: "60s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+
+  webapp:
+    profiles: ["production"]
+    image: "localhost/webapp:latest"
+    build:
+      context: "./"
+      dockerfile: "./Dockerfile"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.webapp.rule: "Host(`webapp.localhost`)"
+      traefik.http.routers.webapp.entryPoints: "websecure"
+      traefik.http.routers.webapp.tls: "true"
+      traefik.http.routers.webapp.service: "webapp@docker"
+      traefik.http.routers.webapp.middlewares: "compress@docker"
+      traefik.http.services.webapp.loadBalancer.server.port: "3000"
+      traefik.http.middlewares.compress.compress.includedContentTypes: >-
+        application/json,
+        application/wasm,
+        application/xml,
+        image/svg+xml,
+        text/css,
+        text/html,
+        text/javascript,
+        text/plain
+    restart: "always"
+    read_only: true
+    networks:
+      - "private"
+    volumes:
+      - { type: "tmpfs", target: "/run/" }
+      - { type: "tmpfs", target: "/tmp/" }
+    environment:
+      PRISMA_DATABASE_URL: "postgresql://webapp:password@postgres:5432/webapp"
+      PRISMA_SHADOW_DATABASE_URL: "postgresql://webapp:password@postgres:5432/webapp_shadow"
+      NUXT_AUTH_OIDC_ROOT_URL: "https://webapp.localhost"
+      NUXT_AUTH_OIDC_CLIENT_ID: "webapp"
+      NUXT_AUTH_OIDC_CLIENT_SECRET: "ourclientbythesewordsguarded"
+      NUXT_AUTH_OIDC_ISSUER: "https://idp.localhost/realms/webapp"
+      NUXT_AUTH_OIDC_AUTHORIZATION_ENDPOINT: "https://idp.localhost/realms/webapp/protocol/openid-connect/auth"
+      NUXT_AUTH_OIDC_TOKEN_ENDPOINT: "http://keycloak:8080/realms/webapp/protocol/openid-connect/token"
+      NUXT_AUTH_OIDC_USER_INFO_ENDPOINT: "http://keycloak:8080/realms/webapp/protocol/openid-connect/userinfo"
+      NUXT_AUTH_OIDC_END_SESSION_ENDPOINT: "https://idp.localhost/realms/webapp/protocol/openid-connect/logout"
+      NUXT_AUTH_OIDC_JWKS_URI: "http://keycloak:8080/realms/webapp/protocol/openid-connect/certs"
+      NUXT_LOG_LEVEL: "debug"
+    depends_on:
+      keycloak:
+        condition: "service_healthy"
+      postgres:
+        condition: "service_healthy"
+
+  keycloak:
+    image: *keycloak-image
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.keycloak.rule: "Host(`idp.localhost`)"
+      traefik.http.routers.keycloak.entryPoints: "websecure"
+      traefik.http.routers.keycloak.tls: "true"
+      traefik.http.routers.keycloak.service: "keycloak@docker"
+      traefik.http.services.keycloak.loadBalancer.server.port: "8080"
+    restart: "always"
+    networks:
+      - "private"
+    environment:
+      KEYCLOAK_ADMIN: "admin"
+      KEYCLOAK_ADMIN_PASSWORD: "password"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_HOST: "0.0.0.0"
+      KC_HTTP_PORT: "8080"
+      KC_HOSTNAME_URL: "https://idp.localhost"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+      KC_PROXY_HEADERS: "xforwarded"
+      KC_DB: "postgres"
+      KC_DB_URL: "jdbc:postgresql://postgres:5432/keycloak"
+      KC_DB_USERNAME: "keycloak"
+      KC_DB_PASSWORD: "password"
+    configs:
+      - source: "keycloak-realm.json"
+        target: "/opt/keycloak/data/import/realm.json"
+    command: ["start", "--import-realm"]
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - |
+          exec 3<>/dev/tcp/localhost/8080
+          printf '%s\r\n' 'GET /health/ready HTTP/1.1' 'Host: localhost:8080' 'Connection: close' '' >&3
+          grep -Fq 'HTTP/1.1 200 OK' <&3
+      start_period: "120s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+    depends_on:
+      postgres:
+        condition: "service_healthy"
+
+  postgres:
+    image: *postgres-image
+    labels:
+      traefik.enable: "true"
+      traefik.tcp.routers.postgres.rule: "HostSNI(`*`)"
+      traefik.tcp.routers.postgres.entryPoints: "postgres"
+      traefik.tcp.routers.postgres.service: "postgres@docker"
+      traefik.tcp.services.postgres.loadBalancer.server.port: "5432"
+    restart: "always"
+    networks:
+      - "private"
+    volumes:
+      - { type: "volume", source: "postgres-data", target: "/var/lib/postgresql/data/" }
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+    configs:
+      - source: "postgres-webapp.sql"
+        target: "/docker-entrypoint-initdb.d/webapp.sql"
+      - source: "postgres-keycloak.sql"
+        target: "/docker-entrypoint-initdb.d/keycloak.sql"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-qU", "postgres"]
+      start_period: "60s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+
+volumes:
+  postgres-data:
+
+configs:
+  keycloak-realm.json:
+    content: |
+      {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "realm": "webapp",
+        "displayName": "WebApp",
+        "enabled": true,
+        "attributes": {
+          "frontendUrl": "https://idp.localhost"
+        },
+        "registrationAllowed": true,
+        "resetPasswordAllowed": true,
+        "rememberMe": true,
+        "registrationEmailAsUsername": false,
+        "loginWithEmailAllowed": true,
+        "duplicateEmailsAllowed": false,
+        "verifyEmail": true,
+        "editUsernameAllowed": true,
+        "accessTokenLifespan": 300,
+        "ssoSessionIdleTimeout": 86400,
+        "ssoSessionIdleTimeoutRememberMe": 7776000,
+        "ssoSessionMaxLifespan": 86400,
+        "ssoSessionMaxLifespanRememberMe": 7776000,
+        "eventsEnabled": true,
+        "eventsExpiration": 7776000,
+        "clients": [
+          {
+            "clientId": "webapp",
+            "enabled": true,
+            "name": "WebApp",
+            "protocol": "openid-connect",
+            "rootUrl": "https://webapp.localhost/",
+            "baseUrl": "https://webapp.localhost/",
+            "redirectUris": [
+              "https://webapp.localhost/login/callback",
+              "http://localhost:3000/login/callback"
+            ],
+            "publicClient": false,
+            "clientAuthenticatorType": "client-secret",
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": false,
+            "authorizationServicesEnabled": false,
+            "attributes": {
+              "post.logout.redirect.uris": "*",
+              "backchannel.logout.url": "http://webapp:3000/logout/backchannel",
+              "backchannel.logout.session.required": "true"
+            },
+            "secret": "ourclientbythesewordsguarded",
+            "protocolMappers": [
+              {
+                "name": "realm roles",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                "config": {
+                  "multivalued": "true",
+                  "claim.name": "roles",
+                  "jsonType.label": "String",
+                  "id.token.claim": "false",
+                  "access.token.claim": "false",
+                  "lightweight.claim": "false",
+                  "userinfo.token.claim": "true",
+                  "introspection.token.claim": "false"
+                }
+              }
+            ]
+          }
+        ],
+        "roles": {
+          "realm": [
+            {
+              "name": "admin",
+              "composites": { "realm": ["editor"] }
+            },
+            {
+              "name": "editor"
+            }
+          ]
+        },
+        "users": [
+          {
+            "username": "admin",
+            "enabled": true,
+            "firstName": "Admin",
+            "lastName": "User",
+            "email": "admin@webapp.localhost",
+            "emailVerified": true,
+            "realmRoles" : ["admin", "default-roles-webapp"],
+            "credentials": [{ "type": "password", "value": "password" }]
+          },
+          {
+            "username": "alice",
+            "enabled": true,
+            "firstName": "Alice",
+            "lastName": "Williams",
+            "email": "alice@webapp.localhost",
+            "emailVerified": true,
+            "realmRoles" : ["editor", "default-roles-webapp"],
+            "credentials": [{ "type": "password", "value": "password" }]
+          },
+          {
+            "username": "bob",
+            "enabled": true,
+            "firstName": "Bob",
+            "lastName": "Roberts",
+            "email": "bob@webapp.localhost",
+            "emailVerified": true,
+            "realmRoles" : ["default-roles-webapp"],
+            "credentials": [{ "type": "password", "value": "password" }]
+          }
+        ]
+      }
+
+  postgres-webapp.sql:
+    content: |
+      CREATE USER webapp PASSWORD 'password';
+      CREATE DATABASE webapp WITH OWNER = webapp ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE webapp TO webapp;
+      CREATE DATABASE webapp_shadow WITH OWNER = webapp ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE webapp_shadow TO webapp;
+
+  postgres-keycloak.sql:
+    content: |
+      CREATE USER keycloak PASSWORD 'password';
+      CREATE DATABASE keycloak WITH OWNER = keycloak ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
+
+networks:
+  public:
+    internal: false
+
+  private:
+    internal: true

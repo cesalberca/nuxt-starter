@@ -1,0 +1,39 @@
+##################################################
+## "build" stage
+##################################################
+
+FROM docker.io/oven/bun:1.1.8-debian@sha256:e1f5bb763d299b68ed5a739e6177079efed3a5dd227507420e0a6c6a5cfa99d0 AS build
+
+ENV BUN_INSTALL=/bun
+ENV PATH=${BUN_INSTALL}/bin:${PATH}
+ENV NITRO_PRESET=bun
+
+WORKDIR /src/
+
+COPY ./package.json ./pnpm-lock.yaml /src/
+COPY ./prisma/ /src/prisma/
+
+RUN --mount=type=cache,id=bun,dst=/bun/install/cache/ \
+	bun install
+
+COPY ./ /src/
+
+RUN --mount=type=cache,id=bun,dst=/bun/install/cache/ \
+	bun run lint build
+
+##################################################
+## "main" stage
+##################################################
+
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:b9452f5cd004c1610d4056be70343a8a7ea3d46bcf0fda3ce90f1ed90e70989c AS main
+
+COPY --from=build --chown=0:0 /usr/local/bin/bun /bun
+COPY --from=build --chown=0:0 /src/.output/ /app/
+
+WORKDIR /app/
+
+HEALTHCHECK --start-period=60s --interval=30s --timeout=10s --retries=2 \
+	CMD ["/bun", "run", "/app/bin/healthcheck.mjs"]
+
+ENTRYPOINT ["/bun", "run", "/app/server/index.mjs"]
+CMD []

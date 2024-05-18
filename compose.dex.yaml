@@ -1,0 +1,224 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+name: "webapp"
+
+# https://hub.docker.com/_/traefik
+x-traefik-image: &traefik-image "docker.io/traefik:3.0"
+# https://hub.docker.com/r/dexidp/dex
+x-dex-image: &dex-image "docker.io/dexidp/dex:v2.39.1"
+# https://hub.docker.com/_/postgres
+x-postgres-image: &postgres-image "docker.io/postgres:16-bookworm"
+
+services:
+  traefik:
+    image: *traefik-image
+    restart: "always"
+    networks:
+      - "public"
+      - "private"
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"
+      - "127.0.0.1:5432:5432/tcp"
+      - "127.0.0.1:8080:8080/tcp"
+    volumes:
+      - { type: "bind", source: "/var/run/docker.sock", target: "/var/run/docker.sock", read_only: true }
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--api.disableDashboardAd=true"
+      - "--global.checkNewVersion=false"
+      - "--global.sendAnonymousUsage=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedByDefault=false"
+      - "--entrypoints.web.address=:80/tcp"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443/tcp"
+      - "--entrypoints.websecure.http3.advertisedPort=443"
+      - "--entrypoints.postgres.address=:5432/tcp"
+      - "--ping=true"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      start_period: "60s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+
+  webapp:
+    profiles: ["production"]
+    image: "localhost/webapp:latest"
+    build:
+      context: "./"
+      dockerfile: "./Dockerfile"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.webapp.rule: "Host(`webapp.localhost`)"
+      traefik.http.routers.webapp.entryPoints: "websecure"
+      traefik.http.routers.webapp.tls: "true"
+      traefik.http.routers.webapp.service: "webapp@docker"
+      traefik.http.routers.webapp.middlewares: "compress@docker"
+      traefik.http.services.webapp.loadBalancer.server.port: "3000"
+      traefik.http.middlewares.compress.compress.includedContentTypes: >-
+        application/json,
+        application/wasm,
+        application/xml,
+        image/svg+xml,
+        text/css,
+        text/html,
+        text/javascript,
+        text/plain
+    restart: "always"
+    read_only: true
+    networks:
+      - "private"
+    volumes:
+      - { type: "tmpfs", target: "/run/" }
+      - { type: "tmpfs", target: "/tmp/" }
+    environment:
+      PRISMA_DATABASE_URL: "postgresql://webapp:password@postgres:5432/webapp"
+      PRISMA_SHADOW_DATABASE_URL: "postgresql://webapp:password@postgres:5432/webapp_shadow"
+      NUXT_AUTH_OIDC_ROOT_URL: "https://webapp.localhost"
+      NUXT_AUTH_OIDC_CLIENT_ID: "webapp"
+      NUXT_AUTH_OIDC_CLIENT_SECRET: "ourclientbythesewordsguarded"
+      NUXT_AUTH_OIDC_ISSUER: "https://idp.localhost/dex"
+      NUXT_AUTH_OIDC_AUTHORIZATION_ENDPOINT: "https://idp.localhost/dex/auth"
+      NUXT_AUTH_OIDC_TOKEN_ENDPOINT: "http://dex:5556/dex/token"
+      NUXT_AUTH_OIDC_USER_INFO_ENDPOINT: "http://dex:5556/dex/userinfo"
+      NUXT_AUTH_OIDC_JWKS_URI: "http://dex:5556/dex/keys"
+      NUXT_AUTH_OIDC_SCOPES: "openid email profile groups"
+      NUXT_AUTH_OIDC_ROLE_ATTRIBUTE_PATH: "'viewer'"
+      NUXT_LOG_LEVEL: "debug"
+    depends_on:
+      dex:
+        condition: "service_healthy"
+      postgres:
+        condition: "service_healthy"
+
+  dex:
+    image: *dex-image
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.dex.rule: "Host(`idp.localhost`)"
+      traefik.http.routers.dex.entryPoints: "websecure"
+      traefik.http.routers.dex.tls: "true"
+      traefik.http.routers.dex.service: "dex@docker"
+      traefik.http.services.dex.loadBalancer.server.port: "5556"
+    restart: "always"
+    networks:
+      - "private"
+    configs:
+      - source: "dex-config.yaml"
+        target: "/etc/dex/config.yaml"
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:5556/dex/healthz"]
+      start_period: "60s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+    depends_on:
+      postgres:
+        condition: "service_healthy"
+
+  postgres:
+    image: *postgres-image
+    labels:
+      traefik.enable: "true"
+      traefik.tcp.routers.postgres.rule: "HostSNI(`*`)"
+      traefik.tcp.routers.postgres.entryPoints: "postgres"
+      traefik.tcp.routers.postgres.service: "postgres@docker"
+      traefik.tcp.services.postgres.loadBalancer.server.port: "5432"
+    restart: "always"
+    networks:
+      - "private"
+    volumes:
+      - { type: "volume", source: "postgres-data", target: "/var/lib/postgresql/data/" }
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password"
+    configs:
+      - source: "postgres-webapp.sql"
+        target: "/docker-entrypoint-initdb.d/webapp.sql"
+      - source: "postgres-dex.sql"
+        target: "/docker-entrypoint-initdb.d/dex.sql"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-qU", "postgres"]
+      start_period: "60s"
+      interval: "10s"
+      timeout: "10s"
+      retries: 2
+
+volumes:
+  postgres-data:
+
+configs:
+  dex-config.yaml:
+    content: |
+      issuer: "https://idp.localhost/dex"
+      storage:
+        type: "postgres"
+        config:
+          host: "postgres"
+          port: 5432
+          database: "dex"
+          user: "dex"
+          password: "password"
+          ssl:
+            mode: "disable"
+      web:
+        http: "0.0.0.0:5556"
+      frontend:
+        issuer: "dex"
+      oauth2:
+        grantTypes: ["authorization_code", "refresh_token"]
+        responseTypes: ["code"]
+        skipApprovalScreen: true
+        alwaysShowLoginScreen: false
+      expiry:
+        deviceRequests: "5m"
+        signingKeys: "6h"
+        idTokens: "24h"
+        authRequests: "24h"
+        refreshTokens:
+          validIfNotUsedFor: "168h"
+          absoluteLifetime: "2160h"
+      staticClients:
+        - name: "WebApp"
+          id: "webapp"
+          secret: "ourclientbythesewordsguarded"
+          redirectURIs:
+            - "https://webapp.localhost/login/callback"
+            - "http://localhost:3000/login/callback"
+      enablePasswordDB: true
+      staticPasswords:
+        - username: "admin"
+          email: "admin@webapp.localhost"
+          hash: "$$2y$$10$$GG6ob33ztCJ21bQaAG1TtOTU6CLS7RcjvXZWWIcYJDswJSfMcBMwO"
+        - username: "alice"
+          email: "alice@webapp.localhost"
+          hash: "$$2y$$10$$GG6ob33ztCJ21bQaAG1TtOTU6CLS7RcjvXZWWIcYJDswJSfMcBMwO"
+        - username: "bob"
+          email: "bob@webapp.localhost"
+          hash: "$$2y$$10$$GG6ob33ztCJ21bQaAG1TtOTU6CLS7RcjvXZWWIcYJDswJSfMcBMwO"
+
+  postgres-webapp.sql:
+    content: |
+      CREATE USER webapp PASSWORD 'password';
+      CREATE DATABASE webapp WITH OWNER = webapp ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE webapp TO webapp;
+      CREATE DATABASE webapp_shadow WITH OWNER = webapp ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE webapp_shadow TO webapp;
+
+  postgres-dex.sql:
+    content: |
+      CREATE USER dex PASSWORD 'password';
+      CREATE DATABASE dex WITH OWNER = dex ENCODING = 'UTF8' TABLESPACE = pg_default;
+      GRANT ALL PRIVILEGES ON DATABASE dex TO dex;
+
+networks:
+  public:
+    internal: false
+
+  private:
+    internal: true
