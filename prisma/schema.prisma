@@ -28,7 +28,7 @@ enum Role {
 /// @@allow('read', true)
 /// @@allow('all', auth() == this)
 model User {
-  id                    String    @id() @map("id")
+  id                    String    @map("id")
   sub                   String    @unique() @map("sub")
   name                  String    @map("name")
   email                 String    @unique() @map("email")
@@ -37,16 +37,18 @@ model User {
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   sessions              Session[]
 
+  @@id([id])
   @@map("users")
 }
 
 model Session {
-  id        String   @id() @map("id")
+  id        String   @map("id")
   sid       String?  @map("sid")
   idToken   String   @map("id_token") @db.Text()
   userId    String   @map("user_id")
   expiresAt DateTime @map("expires_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@id([id])
   @@map("sessions")
 }
