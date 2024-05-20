@@ -16,6 +16,14 @@ generator client {
   output        = "../node_modules/.prisma/client"
 }
 
+enum Role {
+  admin  @map("admin")
+  editor @map("editor")
+  viewer @map("viewer")
+
+  @@map("role")
+}
+
 /// @@allow('create', true)
 /// @@allow('read', true)
 /// @@allow('all', auth() == this)
@@ -24,9 +32,12 @@ model User {
   sub                   String    @unique() @map("sub")
   name                  String    @map("name")
   email                 String    @unique() @map("email")
+  role                  Role      @default(viewer) @map("role")
   refreshToken          String?   @map("refresh_token") @db.Text()
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   sessions              Session[]
+
+  @@map("users")
 }
 
 model Session {
@@ -36,4 +47,6 @@ model Session {
   userId    String   @map("user_id")
   expiresAt DateTime @map("expires_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }

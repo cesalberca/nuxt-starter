@@ -16,10 +16,13 @@ model User {
   sub                   String    @unique @map("sub")
   name                  String    @map("name")
   email                 String    @unique @map("email")
+  role                  Role      @default(viewer) @map("role")
   refreshToken          String?   @map("refresh_token") @db.Text
   refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   sessions              Session[]
 
+
+  @@map("users")
 
   @@allow('create', true)
 
@@ -36,4 +39,14 @@ model Session {
   expiresAt DateTime @map("expires_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+enum Role {
+  admin  @map("admin")
+  editor @map("editor")
+  viewer @map("viewer")
+
+  @@map("role")
 }
