@@ -26,7 +26,7 @@ enum Role {
 
 /// @@allow('create', true)
 /// @@allow('read', true)
-/// @@allow('all', auth() == this)
+/// @@allow('update', false)
 model User {
   id                    String    @map("id")
   sub                   String    @unique() @map("sub")

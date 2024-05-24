@@ -29,7 +29,7 @@ model User {
 
   @@allow('read', true)
 
-  @@allow('all', auth() == this)
+  @@allow('update', false)
 }
 
 model Session {
