@@ -5,6 +5,11 @@ generator client {
   output        = "../node_modules/.prisma/client"
 }
 
+plugin trpc {
+    provider = '@zenstackhq/trpc'
+    output = 'server/trpc/routers/generated'
+}
+
 datasource db {
   provider          = "postgresql"
   url               = env("PRISMA_DATABASE_URL")

@@ -57,9 +57,12 @@ dependencies:
     specifier: ~10.9.0
     version: 10.9.0(nuxt@3.11.2)(rollup@4.17.2)(vue@3.4.27)
   '@zenstackhq/runtime':
-    specifier: 2.1.2
+    specifier: ~2.1.2
     version: 2.1.2(@prisma/client@5.14.0)
   '@zenstackhq/server':
+    specifier: ~2.1.2
+    version: 2.1.2(@prisma/client@5.14.0)
+  '@zenstackhq/trpc':
     specifier: 2.1.2
     version: 2.1.2(@prisma/client@5.14.0)
   h3:
@@ -531,22 +534,18 @@ packages:
       '@chevrotain/gast': 10.4.2
       '@chevrotain/types': 10.4.2
       lodash: 4.17.21
-    dev: true
 
   /@chevrotain/gast@10.4.2:
     resolution: {integrity: sha512-4ZAn8/mjkmYonilSJ60gGj1tAF0cVWYUMlIGA0e4ATAc3a648aCnvpBw7zlPHDQjFp50XC13iyWEgWAKiRKTOA==}
     dependencies:
       '@chevrotain/types': 10.4.2
       lodash: 4.17.21
-    dev: true
 
   /@chevrotain/types@10.4.2:
     resolution: {integrity: sha512-QzSCjg6G4MvIoLeIgOiMR0IgzkGEQqrNJJIr3T5ETRa7l4Av4AMIiEctV99mvDr57iXwwk0/kr3RJxiU36Nevw==}
-    dev: true
 
   /@chevrotain/utils@10.4.2:
     resolution: {integrity: sha512-V34dacxWLwKcvcy32dx96ADJVdB7kOJLm7LyBkBQw5u5HC9WdEFw2G17zml+U3ivavGTrGPJHl8o9/UJm0PlUw==}
-    dev: true
 
   /@cloudflare/kv-asset-handler@0.3.2:
     resolution: {integrity: sha512-EeEjMobfuJrwoctj7FA1y1KEbM0+Q1xSjobIEyie9k4haVEBB7vkDvsasw1pM3rO39mL2akxIAzLMUAtrMHZhA==}
@@ -2679,7 +2678,6 @@ packages:
       minimatch: 5.1.6
       mkdirp: 1.0.4
       path-browserify: 1.0.1
-    dev: true
 
   /@tufjs/canonical-json@2.0.0:
     resolution: {integrity: sha512-yVtV8zsdo8qFHe+/3kw81dSLyF7D576A5cCFCi4X7B39tWT7SekaEFUnvnWJHz+9qO7qJTah1JbrDjWKqFtdWA==}
@@ -3660,7 +3658,6 @@ packages:
     resolution: {integrity: sha512-pfdxnu2boDHYbBBVe734GMKpGmMrMjI82gWM8XZJwUAqEgBqyhYBf4asuoil1NkhEjsaSeUGc+G39ZoElQo1Zw==}
     dependencies:
       langium: 1.3.1
-    dev: true
 
   /@zenstackhq/runtime@2.1.2(@prisma/client@5.14.0):
     resolution: {integrity: sha512-PH/86SGvk5DRsuwceoShbNXSdnGWiUS/19aLCKqhV5+KoaXDfWYnRY+NaVACCYY9zhf5evm88nEwy10myEyBQg==}
@@ -3703,7 +3700,6 @@ packages:
       upper-case-first: 2.0.2
     transitivePeerDependencies:
       - '@prisma/client'
-    dev: true
 
   /@zenstackhq/server@2.1.2(@prisma/client@5.14.0):
     resolution: {integrity: sha512-NbwMLOMPgz7ZpWmOyYIVtH28S6VaQ1ZtRThiBftirKmF/TucQ8dCRQK5MWR3fMIuwpFnQ/4W5gsoc1/trGQthg==}
@@ -3718,6 +3714,20 @@ packages:
       url-pattern: 1.0.3
       zod: 3.23.8
       zod-validation-error: 1.5.0(zod@3.23.8)
+    transitivePeerDependencies:
+      - '@prisma/client'
+    dev: false
+
+  /@zenstackhq/trpc@2.1.2(@prisma/client@5.14.0):
+    resolution: {integrity: sha512-tDF2jJZbUlMa9FdW3UEbG7nJf2DUCqNNFNDQ9CnBffobLS7cfO5O35sdVoXwaEvQVyRr4aViZl2eqTvv6u4DVw==}
+    dependencies:
+      '@zenstackhq/sdk': 2.1.2(@prisma/client@5.14.0)
+      change-case: 4.1.2
+      lower-case-first: 2.0.2
+      ts-morph: 16.0.0
+      tslib: 2.6.2
+      upper-case-first: 2.0.2
+      zod: 3.23.8
     transitivePeerDependencies:
       - '@prisma/client'
     dev: false
@@ -4169,7 +4179,6 @@ packages:
     dependencies:
       chevrotain: 10.4.2
       lodash: 4.17.21
-    dev: true
 
   /chevrotain@10.4.2:
     resolution: {integrity: sha512-gzF5GxE0Ckti5kZVuKEZycLntB5X2aj9RVY0r4/220GwQjdnljU+/t3kP74/FMWC7IzCDDEjQ9wsFUf0WCdSHg==}
@@ -4180,7 +4189,6 @@ packages:
       '@chevrotain/utils': 10.4.2
       lodash: 4.17.21
       regexp-to-ast: 0.5.0
-    dev: true
 
   /chokidar@3.6.0:
     resolution: {integrity: sha512-7VT13fmjotKpGipCW9JEQAusEPE+Ei8nl6/g4FBAmIm0GOOLMua9NDDo/DWp0ZAxCr3cPq5ZpBqmPAQgDda2Pw==}
@@ -4266,7 +4274,6 @@ packages:
 
   /code-block-writer@11.0.3:
     resolution: {integrity: sha512-NiujjUFB4SwScJq2bwbYUtXbZhBSlY6vYzm++3Q6oC+U+injTqfPYFK8wS9COOmb2lueqp0ZRB4nK1VYeHgNyw==}
-    dev: true
 
   /color-convert@1.9.3:
     resolution: {integrity: sha512-QfAUtd+vFdAtFQcC8CCyYt1fYWxSqAiK2cSD6zDB8N3cpsEBAvRxp9zOGg6G/SHHJYAT88/az/IuDGALsNVbGg==}
@@ -6132,7 +6139,6 @@ packages:
       vscode-languageserver: 8.0.2
       vscode-languageserver-textdocument: 1.0.11
       vscode-uri: 3.0.8
-    dev: true
 
   /launch-editor@2.6.1:
     resolution: {integrity: sha512-eB/uXmFVpY4zezmGp5XtU21kwo7GBbKB+EQ+UZeWtGb9yAM5xt/Evk+lYH3eRNAtId+ej4u7TYPFZ07w4s7rRw==}
@@ -7925,7 +7931,6 @@ packages:
 
   /regexp-to-ast@0.5.0:
     resolution: {integrity: sha512-tlbJqcMHnPKI9zSrystikWKwHkBqu2a/Sgw01h3zFjvYrMxEDYHzzoMZnUrbIfpTFEsoRnnviOXNCzFiSc54Qw==}
-    dev: true
 
   /regexp-tree@0.1.27:
     resolution: {integrity: sha512-iETxpjK6YoRWJG5o6hXLwvjYAoW+FEZn9os0PD/b6AP6xQwsa/Y7lCVgIixBbUPMfhu+i2LtdeAqVTgGlQarfA==}
@@ -8699,7 +8704,6 @@ packages:
     dependencies:
       '@ts-morph/common': 0.17.0
       code-block-writer: 11.0.3
-    dev: true
 
   /ts-pattern@4.3.0:
     resolution: {integrity: sha512-pefrkcd4lmIVR0LA49Imjf9DYLK8vtWhqBPA3Ya1ir8xCW0O2yjL9dsCVvI7pCodLC5q7smNpEtDR2yVulQxOg==}
@@ -9234,7 +9238,6 @@ packages:
   /vscode-jsonrpc@8.0.2:
     resolution: {integrity: sha512-RY7HwI/ydoC1Wwg4gJ3y6LpU9FJRZAUnTYMXthqhFXXu77ErDd/xkREpGuk4MyYkk4a+XDWAMqe0S3KkelYQEQ==}
     engines: {node: '>=14.0.0'}
-    dev: true
 
   /vscode-jsonrpc@8.1.0:
     resolution: {integrity: sha512-6TDy/abTQk+zDGYazgbIPc+4JoXdwC8NHU9Pbn4UJP1fehUyZmM4RHp5IthX7A6L5KS30PRui+j+tbbMMMafdw==}
@@ -9274,7 +9277,6 @@ packages:
     dependencies:
       vscode-jsonrpc: 8.0.2
       vscode-languageserver-types: 3.17.2
-    dev: true
 
   /vscode-languageserver-protocol@3.17.3:
     resolution: {integrity: sha512-924/h0AqsMtA5yK22GgMtCYiMdCOtWTSGgUOkgEDX+wk2b0x4sAfLiO4NxBxqbiVtz7K7/1/RgVrVI0NClZwqA==}
@@ -9291,7 +9293,6 @@ packages:
 
   /vscode-languageserver-types@3.17.2:
     resolution: {integrity: sha512-zHhCWatviizPIq9B7Vh9uvrH6x3sK8itC84HkamnBWoDFJtzBf7SWlpLCZUit72b3os45h6RWQNC9xHRDF8dRA==}
-    dev: true
 
   /vscode-languageserver-types@3.17.3:
     resolution: {integrity: sha512-SYU4z1dL0PyIMd4Vj8YOqFvHu7Hz/enbWtpfnVbJHU4Nd1YNYx8u0ennumc6h48GQNeOLxmwySmnADouT/AuZA==}
@@ -9308,7 +9309,6 @@ packages:
     hasBin: true
     dependencies:
       vscode-languageserver-protocol: 3.17.2
-    dev: true
 
   /vscode-languageserver@8.1.0:
     resolution: {integrity: sha512-eUt8f1z2N2IEUDBsKaNapkz7jl5QpskN2Y0G01T/ItMxBxw1fJwvtySGB9QMecatne8jFIWJGWI61dWjyTLQsw==}
